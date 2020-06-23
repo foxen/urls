@@ -65,7 +65,7 @@ func (c *counter) CountWith(cf CountFunc, r io.Reader, w io.Writer) error {
 	if w == nil {
 		return nil
 	}
-	urls, err := readUrls(r, c.ops.MaxUrlLength)
+	urls, err := readAndGuardUrls(r, c.ops.MaxUrlLength)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ outer:
 	return nil
 }
 
-func readUrls(r io.Reader, maxUrlLength int) ([]string, error) {
+func readAndGuardUrls(r io.Reader, maxUrlLength int) ([]string, error) {
 	scanner := bufio.NewScanner(r)
 	var n int
 	uniqueUrls := map[string]struct{}{}
@@ -149,6 +149,9 @@ func newJob(cli *http.Client, cf CountFunc, done chan jobResult) func(string) {
 			resp, err := cli.Get(u)
 			if err != nil {
 				return 0, err
+			}
+			if resp.StatusCode != http.StatusOK {
+				return 0, fmt.Errorf("non 200 response: %d", resp.StatusCode)
 			}
 			bs, err := ioutil.ReadAll(resp.Body)
 			_ = resp.Body.Close()
