@@ -52,10 +52,10 @@ func New(ops Options) Counter {
 	if ops.Timeout == 0 {
 		ops.Timeout = DefaultTimeout
 	}
-	return &counter{ops}
+	return counter{ops}
 }
 
-func (c *counter) CountWith(cf CountFunc, r io.Reader, w io.Writer) error {
+func (c counter) CountWith(cf CountFunc, r io.Reader, w io.Writer) error {
 	if r == nil {
 		return fmt.Errorf("reader cant be nil")
 	}
