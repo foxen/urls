@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 	"testing"
-	"urls/counter"
+	"github.com/foxen/urls/counter"
 )
 
 func TestCounter(t *testing.T) {

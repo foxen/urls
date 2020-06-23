@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"os"
-	"urls/counter"
+	"github.com/foxen/urls/counter"
 )
 
 var goCountFunc counter.CountFunc = func(bs []byte) (int, error) {
