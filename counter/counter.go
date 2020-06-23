@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -28,10 +29,10 @@ type Options struct {
 type CountFunc func(bs []byte) (int, error)
 
 type Counter interface {
-	CountWith(cf CountFunc, r io.Reader, w io.Writer) error
+	Count(r io.Reader, w io.Writer, substr string) error
 }
 
-type jobResult struct {
+type result struct {
 	url string
 	cnt int
 	err error
@@ -59,39 +60,62 @@ func New(ops Options) Counter {
 	return counter{ops}
 }
 
-func (c counter) CountWith(cf CountFunc, r io.Reader, w io.Writer) error {
+func (c counter) Count(r io.Reader, w io.Writer, substr string) error {
 	if r == nil {
 		return fmt.Errorf("reader cant be nil")
-	}
-	if cf == nil {
-		return fmt.Errorf("count function cant be nil")
 	}
 	if w == nil {
 		return nil
 	}
-	urls, err := readAndGuardUrls(r, c.MaxUrlLength)
-	if err != nil {
-		return err
+	jobs := make(chan string, c.MaxJobsN)
+	results := make(chan result, c.MaxJobsN)
+	worker := func() {
+		for u := range jobs {
+			cnt, err := countInResource(u, c.HttpClient, substr)
+			if err != nil {
+				results <- result{url: u, cnt: 0, err: err}
+				return
+			}
+			results <- result{url: u, cnt: cnt, err: nil}
+		}
 	}
-	l := len(urls)
-	done := make(chan jobResult, l)
+	scanner := bufio.NewScanner(r)
+	uniqueUrls := map[string]struct{}{}
+	var n int
+	var queued []string
+	for scanner.Scan() {
+		bs := scanner.Bytes()
+		if len(bs) > c.MaxUrlLength {
+			return fmt.Errorf("%d url is too long, max url length is: %d bytes", n, c.MaxUrlLength)
+		}
+		u := string(bs)
+		_, err := url.Parse(u)
+		if err != nil {
+			return fmt.Errorf("%d url is invalid: %s", n, err)
+		}
+		if _, ok := uniqueUrls[u]; ok {
+			continue
+		}
+		uniqueUrls[u] = struct{}{}
+		n++
+		if n <= c.MaxJobsN {
+			go worker()
+		}
+		if len(jobs) < cap(jobs) {
+			jobs <- u
+			continue
+		}
+		queued = append(queued, u)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
 	defer cancel()
-	for i := 0; i < c.MaxJobsN; i++ {
-		if len(urls) == 0 {
-			break
-		}
-		go newJob(c.HttpClient, cf, done)(urls[0])
-		urls = urls[1:]
-	}
-	ttl := 0
-	doneN := 0
+	var ttl, done int
 outer:
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("timed out")
-		case res := <-done:
+		case res := <-results:
 			if res.err != nil {
 				return res.err
 			}
@@ -99,67 +123,36 @@ outer:
 				return err
 			}
 			ttl += res.cnt
-			doneN++
-			if doneN == l {
+			done++
+			if done == n {
 				break outer
 			}
-			if len(urls) > 0 {
-				go newJob(c.HttpClient, cf, done)(urls[0])
-				urls = urls[1:]
+			if len(queued) == 0 {
+				continue
 			}
+			jobs <- queued[0]
+			queued = queued[1:]
 		}
 	}
+	close(jobs)
 	if _, err := w.Write([]byte(fmt.Sprintf("Total: %d\n", ttl))); err != nil {
 		return err
 	}
 	return nil
 }
 
-func readAndGuardUrls(r io.Reader, maxUrlLength int) ([]string, error) {
-	scanner := bufio.NewScanner(r)
-	var n int
-	uniqueUrls := map[string]struct{}{}
-	var urls []string
-	for scanner.Scan() {
-		n++
-		bs := scanner.Bytes()
-		if len(bs) > maxUrlLength {
-			return nil, fmt.Errorf("%d url is too long, max url length is: %d bytes", n, maxUrlLength)
-		}
-		u := string(bs)
-		_, err := url.Parse(u)
-		if err != nil {
-			return nil, fmt.Errorf("%d url is invalid: %s", n, err)
-		}
-		if _, ok := uniqueUrls[u]; ok {
-			continue
-		}
-		uniqueUrls[u] = struct{}{}
-		urls = append(urls, u)
+func countInResource(u string, cli *http.Client, substr string) (int, error) {
+	resp, err := cli.Get(u)
+	if err != nil {
+		return 0, err
 	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("non 200 response: %d", resp.StatusCode)
 	}
-	return urls, nil
-}
-
-func newJob(cli *http.Client, cf CountFunc, done chan jobResult) func(string) {
-	return func(u string) {
-		cnt, err := func(u string) (int, error) {
-			resp, err := cli.Get(u)
-			if err != nil {
-				return 0, err
-			}
-			if resp.StatusCode != http.StatusOK {
-				return 0, fmt.Errorf("non 200 response: %d", resp.StatusCode)
-			}
-			bs, err := ioutil.ReadAll(resp.Body)
-			_ = resp.Body.Close()
-			if err != nil {
-				return 0, err
-			}
-			return cf(bs)
-		}(u)
-		done <- jobResult{url: u, cnt: cnt, err: err}
+	bs, err := ioutil.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil {
+		return 0, err
 	}
+	return strings.Count(string(bs), substr), nil
 }

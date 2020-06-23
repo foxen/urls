@@ -12,23 +12,23 @@ import (
 
 func TestCounter(t *testing.T) {
 	goldenData := map[string]string{
-		"https://golang.org/pkg/compress/": "9",
-		"https://golang.org/pkg/crypto/md5/": "10",
-		"https://golang.org/": "20",
-		"https://golang.org/doc/": "75",
-		"https://golang.org/pkg/compress/gzip/": "17",
-		"https://golang.org/pkg/debug/pe/": "25",
-		"https://golang.org/pkg/log/syslog/": "9",
-		"https://golang.org/pkg/sort/": "51",
-		"https://golang.org/pkg/strconv/": "41",
-		"https://golang.org/pkg/sync/": "21",
-		"https://golang.org/pkg/strings/": "55",
-		"https://golang.org/pkg/unsafe/": "15",
-		"https://golang.org/pkg/unicode/": "37",
-		"https://golang.org/pkg/time/": "50",
-		"https://godoc.org/golang.org/x/net": "9",
+		"https://golang.org/pkg/compress/":          "9",
+		"https://golang.org/pkg/crypto/md5/":        "10",
+		"https://golang.org/":                       "20",
+		"https://golang.org/doc/":                   "75",
+		"https://golang.org/pkg/compress/gzip/":     "17",
+		"https://golang.org/pkg/debug/pe/":          "25",
+		"https://golang.org/pkg/log/syslog/":        "9",
+		"https://golang.org/pkg/sort/":              "51",
+		"https://golang.org/pkg/strconv/":           "41",
+		"https://golang.org/pkg/sync/":              "21",
+		"https://golang.org/pkg/strings/":           "55",
+		"https://golang.org/pkg/unsafe/":            "15",
+		"https://golang.org/pkg/unicode/":           "37",
+		"https://golang.org/pkg/time/":              "50",
+		"https://godoc.org/golang.org/x/net":        "9",
 		"https://godoc.org/golang.org/x/benchmarks": "8",
-		"https://godoc.org/golang.org/x/mobile": "19",
+		"https://godoc.org/golang.org/x/mobile":     "19",
 	}
 	goldenTtl := "471"
 
@@ -41,13 +41,13 @@ func TestCounter(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := bytes.NewBufferString("")
-	if err := ctr.CountWith(goCountFunc, f, w); err != nil {
+	if err := ctr.Count(f, w, "Go"); err != nil {
 		t.Fatal(err)
 	}
 	o := w.String()
 	data, ttl := parseOutput(o, t)
 	if len(goldenData) != len(data) {
-		t.Fatalf("want: %d; get: %d", len(goldenData), len(data) )
+		t.Fatalf("want: %d; get: %d", len(goldenData), len(data))
 	}
 	for u, gv := range goldenData {
 		v, ok := data[u]
@@ -66,29 +66,29 @@ func TestCounter(t *testing.T) {
 `
 	justWrong := "https://a.b"
 	w.Reset()
-	wrongCases := []struct{
-		name string
-		fn counter.CountFunc
-		r io.Reader
-		w io.Writer
-	} {
+	wrongCases := []struct {
+		name   string
+		substr string
+		r      io.Reader
+		w      io.Writer
+	}{
 		{
 			"empty string",
-			goCountFunc,
+			"Go",
 			strings.NewReader(empty),
 			w,
 		},
 		{
 			"wrong url",
-			goCountFunc,
+			"Go",
 			strings.NewReader(justWrong),
 			w,
 		},
 	} // and so on
-	// TODO: improve wrong cases variants coverage
+	// TODO: improve wrong cases coverage
 	for _, c := range wrongCases {
 		t.Run(c.name, func(t *testing.T) {
-			if err := ctr.CountWith(c.fn, c.r, c.w); err == nil {
+			if err := ctr.Count(c.r, c.w, c.substr); err == nil {
 				t.Fatal(err)
 			} else {
 				t.Log(err)
