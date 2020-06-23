@@ -20,7 +20,7 @@ const (
 
 type Options struct {
 	MaxUrlLength int
-	MaxJobsN     int // 0 stands for unlimited
+	MaxJobsN     int
 	HttpClient   *http.Client
 	Timeout      time.Duration
 }
@@ -38,7 +38,7 @@ type jobResult struct {
 }
 
 type counter struct {
-	ops Options
+	Options
 }
 
 func New(ops Options) Counter {
@@ -69,23 +69,19 @@ func (c counter) CountWith(cf CountFunc, r io.Reader, w io.Writer) error {
 	if w == nil {
 		return nil
 	}
-	urls, err := readAndGuardUrls(r, c.ops.MaxUrlLength)
+	urls, err := readAndGuardUrls(r, c.MaxUrlLength)
 	if err != nil {
 		return err
 	}
 	l := len(urls)
 	done := make(chan jobResult, l)
-	ctx, cancel := context.WithTimeout(context.Background(), c.ops.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
 	defer cancel()
-	maxJobsN := c.ops.MaxJobsN
-	if c.ops.MaxJobsN == 0 {
-		maxJobsN = len(urls)
-	}
-	for i := 0; i < maxJobsN; i++ {
+	for i := 0; i < c.MaxJobsN; i++ {
 		if len(urls) == 0 {
 			break
 		}
-		go newJob(c.ops.HttpClient, cf, done)(urls[0])
+		go newJob(c.HttpClient, cf, done)(urls[0])
 		urls = urls[1:]
 	}
 	ttl := 0
@@ -108,7 +104,7 @@ outer:
 				break outer
 			}
 			if len(urls) > 0 {
-				go newJob(c.ops.HttpClient, cf, done)(urls[0])
+				go newJob(c.HttpClient, cf, done)(urls[0])
 				urls = urls[1:]
 			}
 		}

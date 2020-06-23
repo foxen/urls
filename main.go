@@ -2,8 +2,8 @@ package main
 
 import (
 	"bufio"
-	"os"
 	"github.com/foxen/urls/counter"
+	"os"
 )
 
 var goCountFunc counter.CountFunc = func(bs []byte) (int, error) {

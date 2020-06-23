@@ -2,12 +2,12 @@ package main
 
 import (
 	"bytes"
+	"github.com/foxen/urls/counter"
 	"io"
 	"os"
 	"path"
 	"strings"
 	"testing"
-	"github.com/foxen/urls/counter"
 )
 
 func TestCounter(t *testing.T) {
