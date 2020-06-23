@@ -21,7 +21,7 @@ type Options struct {
 	MaxUrlLength int
 	MaxJobsN     int // 0 stands for unlimited, default
 	HttpClient   *http.Client
-	Timout       time.Duration
+	Timeout       time.Duration
 }
 
 type CountFunc func(bs []byte) (int, error)
@@ -49,8 +49,8 @@ func New(ops Options) Counter {
 			Timeout: DefaultHttpClientTimeout,
 		}
 	}
-	if ops.Timout == 0 {
-		ops.Timout = DefaultTimeout
+	if ops.Timeout == 0 {
+		ops.Timeout = DefaultTimeout
 	}
 	return &counter{ops}
 }
@@ -71,7 +71,7 @@ func (c *counter) CountWith(cf CountFunc, r io.Reader, w io.Writer) error {
 	}
 	l := len(urls)
 	done := make(chan jobResult, l)
-	ctx, cancel := context.WithTimeout(context.Background(), c.ops.Timout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.ops.Timeout)
 	defer cancel()
 	maxJobsN := c.ops.MaxJobsN
 	if c.ops.MaxJobsN == 0 {
