@@ -15,13 +15,14 @@ const (
 	DefaultMaxUrlLength      = http.DefaultMaxHeaderBytes
 	DefaultHttpClientTimeout = time.Second
 	DefaultTimeout           = time.Second * 10
+	DefaultMaxJobsN          = 1
 )
 
 type Options struct {
 	MaxUrlLength int
-	MaxJobsN     int // 0 stands for unlimited, default
+	MaxJobsN     int // 0 stands for unlimited
 	HttpClient   *http.Client
-	Timeout       time.Duration
+	Timeout      time.Duration
 }
 
 type CountFunc func(bs []byte) (int, error)
@@ -51,6 +52,9 @@ func New(ops Options) Counter {
 	}
 	if ops.Timeout == 0 {
 		ops.Timeout = DefaultTimeout
+	}
+	if ops.MaxJobsN == 0 {
+		ops.MaxJobsN = DefaultMaxJobsN
 	}
 	return counter{ops}
 }
