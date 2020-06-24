@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -69,7 +70,9 @@ func (c counter) Count(r io.Reader, w io.Writer, substr string) error {
 	}
 	jobs := make(chan string, c.MaxJobsN)
 	results := make(chan result, c.MaxJobsN)
+	var wg sync.WaitGroup
 	worker := func() {
+		defer wg.Done()
 		for u := range jobs {
 			cnt, err := countInResource(u, c.HttpClient, substr)
 			if err != nil {
@@ -99,6 +102,7 @@ func (c counter) Count(r io.Reader, w io.Writer, substr string) error {
 		uniqueUrls[u] = struct{}{}
 		n++
 		if n <= c.MaxJobsN {
+			wg.Add(1)
 			go worker()
 		}
 		if len(jobs) < cap(jobs) {
@@ -135,6 +139,7 @@ outer:
 		}
 	}
 	close(jobs)
+	wg.Wait()
 	if _, err := w.Write([]byte(fmt.Sprintf("Total: %d\n", ttl))); err != nil {
 		return err
 	}
