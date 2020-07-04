@@ -124,7 +124,7 @@ outer:
 			}
 			ttl += res.cnt
 			done++
-			if done == n {
+			if done == len(uniqueUrls) {
 				break outer
 			}
 			if len(queued) == 0 {
