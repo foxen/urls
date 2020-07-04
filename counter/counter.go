@@ -75,11 +75,7 @@ func (c counter) Count(r io.Reader, w io.Writer, substr string) error {
 		defer wg.Done()
 		for u := range jobs {
 			cnt, err := countInResource(u, c.HttpClient, substr)
-			if err != nil {
-				results <- result{url: u, cnt: 0, err: err}
-				return
-			}
-			results <- result{url: u, cnt: cnt, err: nil}
+			results <- result{url: u, cnt: cnt, err: err}
 		}
 	}
 	scanner := bufio.NewScanner(r)
