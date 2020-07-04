@@ -89,6 +89,7 @@ func (c counter) Count(r io.Reader, w io.Writer, substr string) error {
 		}
 		u := string(bs)
 		_, err := url.Parse(u)
+		n++
 		if err != nil {
 			return fmt.Errorf("%d url is invalid: %s", n, err)
 		}
@@ -96,8 +97,7 @@ func (c counter) Count(r io.Reader, w io.Writer, substr string) error {
 			continue
 		}
 		uniqueUrls[u] = struct{}{}
-		n++
-		if n <= c.MaxJobsN {
+		if len(uniqueUrls) <= c.MaxJobsN {
 			wg.Add(1)
 			go worker()
 		}
